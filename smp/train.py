@@ -157,6 +157,9 @@ def train(args):
                                              shuffle=False,
                                              num_workers=num_workers,
                                              collate_fn=collate_fn)
+    
+    if args.use_amp is not None:
+        scaler = torch.cuda.amp.GradScaler()
 
     for epoch in range(num_epochs):
         model.train()
@@ -172,14 +175,22 @@ def train(args):
             # device 할당
             model = model.to(device)
 
-            # inference
-            outputs = model(images)
-
-            # loss 계산
-            loss = criterion(outputs, masks)
             optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+
+            if args.use_amp is not None:
+                with torch.cuda.amp.autocast():
+                    # inference
+                    outputs = model(images)
+                    # loss 계산
+                    loss = criterion(outputs, masks)
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                outputs = model(images)
+                loss = criterion(outputs, masks)
+                loss.backward()
+                optimizer.step()
 
             outputs = torch.argmax(outputs, dim=1).detach().cpu().numpy()
             masks = masks.detach().cpu().numpy()
@@ -224,6 +235,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', type=str, default='../../data')
     parser.add_argument('--train_json', type=str, default='train.json')
     parser.add_argument('--val_json', type=str, default='val.json')
+    parser.add_argument('--use_amp', action='store_true')
 
     args = parser.parse_args()
     print(args)
