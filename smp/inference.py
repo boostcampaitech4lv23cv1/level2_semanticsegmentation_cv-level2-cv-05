@@ -1,6 +1,7 @@
 import argparse
 import warnings
 import multiprocessing
+import pickle
 import numpy as np
 import pandas as pd
 import torch
@@ -48,14 +49,29 @@ def test(model, test_loader, device):
     return file_names, preds_array
 
 
+def get_logits(model, test_loader, device):
+    model.eval()
+    logits = []
+    with torch.no_grad():
+        for _, (imgs, _) in enumerate(tqdm(test_loader)):
+            
+            outs = model(torch.stack(imgs).to(device))
+            outs = outs.squeeze().detach().cpu().numpy()
+            logits.append(outs)
+    
+    return logits
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--batch_size', type=int, default=8, help='input batch size for training (default: 8)')
     parser.add_argument('--model', type=str, default='base', help='model type (default: base)')
     parser.add_argument('--data_dir', type=str, default='../../data')
+    parser.add_argument('--output_name', type=str, default='output')
     parser.add_argument('--test_json', type=str, default='test.json')
     parser.add_argument('--model_dir', type=str, default='./saved/exp/latest.pt')
+    parser.add_argument('--get_logits', action='store_true')
 
     args = parser.parse_args()
 
@@ -73,6 +89,7 @@ if __name__ == '__main__':
 
     model = model.to(device)
 
+        
     # test dataset
     test_transform = A.Compose(
         [
@@ -82,22 +99,33 @@ if __name__ == '__main__':
     dataset_path = args.data_dir
     test_dataset = CustomDataset(dataset_path, args.test_json, mode='test',
                                  transform=test_transform)
-    test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
-                                              batch_size=args.batch_size,
-                                              num_workers=num_workers,
-                                              collate_fn=collate_fn)
+    
+    if args.get_logits is not None:
+        test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
+                                                  batch_size=1,
+                                                  num_workers=num_workers,
+                                                  collate_fn=collate_fn)
+        logits = get_logits(model, test_loader, device)
+        output_name = f'{args.output_name}.pickle'
+        with open(output_name, 'wb') as f:
+            pickle.dump(logits, f, pickle.HIGHEST_PROTOCOL)
+    else:
+        test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
+                                                  batch_size=args.batch_size,
+                                                  num_workers=num_workers,
+                                                  collate_fn=collate_fn)
 
-    # sample_submisson.csv 열기
-    submission = pd.read_csv('../submission/sample_submission.csv', index_col=None)
+        # sample_submisson.csv 열기
+        submission = pd.read_csv('../submission/sample_submission.csv', index_col=None)
 
-    # test set에 대한 prediction
-    file_names, preds = test(model, test_loader, device)
+        # test set에 대한 prediction
+        file_names, preds = test(model, test_loader, device)
 
-    # PredictionString 대입
-    for file_name, string in zip(file_names, preds):
-        submission = submission.append(
-                {"image_id": file_name, "PredictionString": ' '.join(str(e) for e in string.tolist())},
-                ignore_index=True)
+        # PredictionString 대입
+        for file_name, string in zip(file_names, preds):
+            submission = submission.append(
+                    {"image_id": file_name, "PredictionString": ' '.join(str(e) for e in string.tolist())},
+                    ignore_index=True)
 
-    # ./submission/output.csv로 저장
-    submission.to_csv("../submission/output.csv", index=False)
+        output_name = f'../submission/{args.output_name}.csv'
+        submission.to_csv("../submission/output.csv", index=False)
