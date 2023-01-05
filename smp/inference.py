@@ -5,6 +5,7 @@ import pickle
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn.functional as F
 from importlib import import_module
 from tqdm import tqdm
 import albumentations as A
@@ -13,7 +14,7 @@ from dataset import CustomDataset
 from train import collate_fn
 
 
-def test(model, test_loader, device):
+def predict(model, test_loader, device):
     size = 256
     transform = A.Compose([A.Resize(size, size)])
     print('Start prediction.')
@@ -24,7 +25,7 @@ def test(model, test_loader, device):
     preds_array = np.empty((0, size*size), dtype=np.long)
 
     with torch.no_grad():
-        for step, (imgs, image_infos) in enumerate(tqdm(test_loader)):
+        for _, (imgs, image_infos) in enumerate(tqdm(test_loader)):
 
             # inference (512 x 512)
             outs = model(torch.stack(imgs).to(device))
@@ -49,17 +50,19 @@ def test(model, test_loader, device):
     return file_names, preds_array
 
 
-def get_logits(model, test_loader, device):
+def predict_proba(model, test_loader, device):
     model.eval()
-    logits = []
+    preds_list = []
     with torch.no_grad():
         for _, (imgs, _) in enumerate(tqdm(test_loader)):
-            
+
             outs = model(torch.stack(imgs).to(device))
-            outs = outs.squeeze().detach().cpu().numpy()
+            outs = outs.squeeze()
+            outs = F.softmax(outs, dim=0)
+            outs = outs.detach().cpu().numpy()
             logits.append(outs)
-    
-    return logits
+
+    return preds_list
 
 
 if __name__ == '__main__':
@@ -71,7 +74,7 @@ if __name__ == '__main__':
     parser.add_argument('--output_name', type=str, default='output')
     parser.add_argument('--test_json', type=str, default='test.json')
     parser.add_argument('--model_dir', type=str, default='./saved/exp/latest.pt')
-    parser.add_argument('--get_logits', action='store_true')
+    parser.add_argument('--get_proba', action='store_true')
 
     args = parser.parse_args()
 
@@ -89,7 +92,7 @@ if __name__ == '__main__':
 
     model = model.to(device)
 
-        
+
     # test dataset
     test_transform = A.Compose(
         [
@@ -99,13 +102,13 @@ if __name__ == '__main__':
     dataset_path = args.data_dir
     test_dataset = CustomDataset(dataset_path, args.test_json, mode='test',
                                  transform=test_transform)
-    
-    if args.get_logits is not None:
+
+    if args.get_proba is not None:
         test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
                                                   batch_size=1,
                                                   num_workers=num_workers,
                                                   collate_fn=collate_fn)
-        logits = get_logits(model, test_loader, device)
+        logits = predict_proba(model, test_loader, device)
         output_name = f'{args.output_name}.pickle'
         with open(output_name, 'wb') as f:
             pickle.dump(logits, f, pickle.HIGHEST_PROTOCOL)
@@ -119,7 +122,7 @@ if __name__ == '__main__':
         submission = pd.read_csv('../submission/sample_submission.csv', index_col=None)
 
         # test set에 대한 prediction
-        file_names, preds = test(model, test_loader, device)
+        file_names, preds = predict(model, test_loader, device)
 
         # PredictionString 대입
         for file_name, string in zip(file_names, preds):
