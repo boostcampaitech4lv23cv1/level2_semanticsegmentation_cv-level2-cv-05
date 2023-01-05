@@ -97,3 +97,47 @@ class BaseAugmentation:
 
     def __call__(self, image, mask):
         return self.transform(image=np.array(image), mask=np.int8(mask))
+
+
+class AugmentationV1:
+    def __init__(self, **args):
+        self.transform = A.Compose([
+            A.ShiftScaleRotate(rotate_method='largest_box', p=0.5),
+            A.RandomBrightness(p=0.5),
+            ToTensorV2(),
+        ])
+
+    def __call__(self, image, mask):
+        return self.transform(image=np.array(image), mask=np.int8(mask))
+
+
+class AugmentationV2:
+    def __init__(self, **args):
+        self.transform = A.Compose([
+            A.OneOf([
+                A.HorizontalFlip(p=1.0),
+                A.VerticalFlip(p=1.0),
+            ], p=0.5),
+            A.OneOf([
+                A.ShiftScaleRotate(rotate_method='largest_box', p=1.0),
+                A.RandomRotate90(p=0.5),
+            ], p=0.8),
+            A.RandomResizedCrop(512, 512, scale=(0.8, 1.0), p=0.4),
+            A.OneOf([
+                A.RandomBrightness(p=1.0),
+                A.RandomContrast(p=0.5),
+            ], p=0.4),
+            A.OneOf([
+                A.RandomSnow(brightness_coeff=2.5, snow_point_lower=0.3,
+                             snow_point_upper=0.5, p=0.5),
+                A.RandomShadow(num_shadows_lower=1, num_shadows_upper=1,
+                               shadow_dimension=5, shadow_roi=(0, 0.5, 1, 1),
+                               p=0.5),
+                A.RandomRain(brightness_coefficient=0.9, drop_width=1,
+                             blur_value=5, p=0.5),
+            ], p=0.3),
+            ToTensorV2()
+        ])
+
+    def __call__(self, image, mask):
+        return self.transform(image=np.array(image), mask=np.int8(mask))
