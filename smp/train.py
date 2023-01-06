@@ -11,6 +11,7 @@ from importlib import import_module
 from pathlib import Path
 from dataset import CustomDataset, category_names
 from loss import create_criterion
+from optimizer import create_optimizer
 from utils import add_hist, label_accuracy_score
 
 
@@ -125,12 +126,8 @@ def train(args):
     criterion = create_criterion(args.criterion)  # default : cross_entropy
 
     # Optimizer 정의
-    opt_module = getattr(import_module("torch.optim"), args.optimizer)
-    optimizer = opt_module(
-        filter(lambda p: p.requires_grad, model.parameters()),
-        lr=lr,
-        weight_decay=weight_decay,
-    )
+    optimizer = create_optimizer(args.optimizer, params=model.parameters(),
+                                 lr=lr, weight_decay=weight_decay)
 
     # Augmentation
     transform_module = getattr(import_module("dataset"), args.augmentation)
