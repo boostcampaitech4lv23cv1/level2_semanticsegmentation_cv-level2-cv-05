@@ -12,6 +12,7 @@ from pathlib import Path
 from dataset import CustomDataset, category_names
 from loss import create_criterion
 from optimizer import create_optimizer
+from scheduler import get_scheduler
 from utils import add_hist, label_accuracy_score
 
 
@@ -125,11 +126,13 @@ def train(args):
 
 
     # Loss function 정의
-    criterion = create_criterion(args.criterion)  # default : cross_entropy
+    criterion = create_criterion(args.criterion)
 
     # Optimizer 정의
     optimizer = create_optimizer(args.optimizer, params=model.parameters(),
                                  lr=lr, weight_decay=weight_decay)
+    # Scheduler 정의
+    scheduler = get_scheduler(args.scheduler, optimizer)
 
     # Augmentation
     transform_module = getattr(import_module("dataset"), args.augmentation)
@@ -156,7 +159,7 @@ def train(args):
                                              shuffle=False,
                                              num_workers=num_workers,
                                              collate_fn=collate_fn)
-    
+
     if args.use_amp is not None:
         scaler = torch.cuda.amp.GradScaler()
 
@@ -215,6 +218,9 @@ def train(args):
             if epoch + 1 == num_epochs:
                 save_model(model, saved_dir, file_name='latest.pt')
 
+        if scheduler is not None:
+            scheduler.step()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -230,6 +236,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate (default: 1e-4)')
     parser.add_argument('--weight_decay', type=float, default=1e-6)
     parser.add_argument('--criterion', type=str, default='cross_entropy', help='criterion type (default: cross_entropy)')
+    parser.add_argument('--scheduler', type=str, default=None)
     parser.add_argument('--log_interval', type=int, default=25, help='how many batches to wait before logging training status')
     parser.add_argument('--val_every', type=int, default=1)
     parser.add_argument('--name', default='exp', help='model save at {name}')
