@@ -7,6 +7,8 @@ import argparse
 import warnings
 import numpy as np
 import torch
+import wandb
+from datetime import datetime, timedelta
 from importlib import import_module
 from pathlib import Path
 from dataset import CustomDataset, category_names
@@ -50,7 +52,7 @@ def increment_path(path, exist_ok=False):
         return f"{path}{n}"
 
 
-def validation(epoch, model, data_loader, criterion, device):
+def validation(epoch, model, data_loader, criterion, device, use_wandb=None):
     print(f'Start validation #{epoch}')
     model.eval()
 
@@ -87,6 +89,26 @@ def validation(epoch, model, data_loader, criterion, device):
         print(f'Validation #{epoch}  Average Loss: {round(avrg_loss.item(), 4)}, Accuracy : {round(acc, 4)}, \
                 mIoU: {round(mIoU, 4)}')
         print(f'IoU by class : {IoU_by_class}')
+
+        if use_wandb is not None:
+            wandb.log({
+                "val/acc": acc, 
+                "val/acc_cls": acc_cls, 
+                "val/mIoU": mIoU, 
+                "val/fwavacc": fwavacc,
+                "val/avg_loss": avrg_loss,
+                "val/Background": IoU_by_class[0]["Backgroud"],
+                "val/General_Trash": IoU_by_class[1]["General trash"],
+                "val/Paper": IoU_by_class[2]["Paper"],
+                "val/Paper_pack": IoU_by_class[3]["Paper pack"],
+                "val/Metal": IoU_by_class[4]["Metal"],
+                "val/Glass": IoU_by_class[5]["Glass"],
+                "val/Plastic": IoU_by_class[6]["Plastic"],
+                "val/Styrofoam": IoU_by_class[7]["Styrofoam"],
+                "val/Plastic_bag": IoU_by_class[8]["Plastic bag"],
+                "val/Battery": IoU_by_class[9]["Battery"],
+                "val/Clothing": IoU_by_class[10]["Clothing"],
+            })
 
     return avrg_loss, mIoU
 
@@ -167,6 +189,12 @@ def train(args):
     for epoch in range(num_epochs):
         model.train()
 
+        if args.use_wandb is not None:
+            wandb.log({
+                'epoch': epoch + 1,
+                'lr': optimizer.param_groups[0]['lr'],
+            })
+
         hist = np.zeros((n_class, n_class))
         for step, (images, masks, _) in enumerate(train_loader):
             images = torch.stack(images)
@@ -205,16 +233,26 @@ def train(args):
             if (step + 1) % log_interval == 0:
                 print(f'Epoch [{epoch+1}/{num_epochs}], Step [{step+1}/{len(train_loader)}], \
                         Loss: {round(loss.item(),4)}, mIoU: {round(mIoU,4)}')
+                if args.use_wandb is not None:
+                    wandb.log({                        
+                        'train/acc': acc,
+                        'train/acc_cls': acc_cls,
+                        'train/mIoU': mIoU,
+                        'train/fwavacc': fwavacc,
+                        'train/loss': loss,
+                    })
 
         # validation 주기에 따른 mIoU 출력 및 best model 저장
         if (epoch + 1) % val_every == 0:
-            _, val_mIoU = validation(epoch + 1, model, val_loader, criterion, device)
+            _, val_mIoU = validation(epoch + 1, model, val_loader, criterion, device, args.use_wandb)
             if val_mIoU > best_mIoU:
                 print(f"Best mIoU {round(val_mIoU, 4)} at epoch: {epoch + 1}")
                 best_mIoU = val_mIoU
                 fname = f'epoch{epoch + 1}_mIoU{round(val_mIoU, 4)}.pt'
                 save_model(model, saved_dir, file_name=fname)
                 print(f"Save model in {saved_dir}")
+
+                wandb.log({'Best_mIoU': best_mIoU})
 
             if epoch + 1 == num_epochs:
                 save_model(model, saved_dir, file_name='latest.pt')
@@ -245,6 +283,9 @@ if __name__ == '__main__':
     parser.add_argument('--train_json', type=str, default='train.json')
     parser.add_argument('--val_json', type=str, default='val.json')
     parser.add_argument('--use_amp', action='store_true')
+    parser.add_argument('--use_wandb', action='store_true')
+    parser.add_argument('--wandb_project', type=str, default=None)
+    parser.add_argument('--wandb_entity', type=str, default=None)
 
     args = parser.parse_args()
     print(args)
@@ -252,4 +293,15 @@ if __name__ == '__main__':
     warnings.filterwarnings(action='ignore')
     torch.cuda.empty_cache()
 
+    now = (datetime.now().replace(microsecond=0) + timedelta(hours=9)).strftime("%m-%d %H:%M")
+
+    wandb.init(
+        project=args.wandb_project,
+        entity=args.wandb_entity,
+        name=f'{args.name}_{now}',
+        tags=[args.model, args.encoder, args.optimizer, args.criterion],
+    )
+
     train(args)
+
+    wandb.finish()
