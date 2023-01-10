@@ -122,7 +122,7 @@ def train(args):
 
     # Model 정의
     model_module = getattr(import_module("model"), 'get_smp_model')
-    model = model_module(args.model, args.encoder, args.pretrained)
+    model = model_module(args.model, args.encoder, args.encoder_weights)
 
 
     # Loss function 정의
@@ -150,6 +150,7 @@ def train(args):
     # DataLoader
     train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
                                                batch_size=batch_size,
+                                               drop_last=True,
                                                shuffle=True,
                                                num_workers=num_workers,
                                                collate_fn=collate_fn)
@@ -231,7 +232,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=8, help='input batch size for training (default: 8)')
     parser.add_argument('--model', type=str, default='Unet', help='model type (default: Unet)')
     parser.add_argument('--encoder', type=str, default='efficientnet-b0', help='model encoder (default: efficientnet-b0')
-    parser.add_argument('--pretrained', type=str, default="imagenet")
+    parser.add_argument('--encoder_weights', type=str, default="imagenet")
     parser.add_argument('--optimizer', type=str, default='Adam', help='optimizer type (default: Adam)')
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate (default: 1e-4)')
     parser.add_argument('--weight_decay', type=float, default=1e-6)
