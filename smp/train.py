@@ -52,7 +52,7 @@ def increment_path(path, exist_ok=False):
         return f"{path}{n}"
 
 
-def validation(epoch, model, data_loader, criterion, device, use_wandb=None):
+def validation(epoch, model, data_loader, criterion, device, use_wandb=False):
     print(f'Start validation #{epoch}')
     model.eval()
 
@@ -90,7 +90,7 @@ def validation(epoch, model, data_loader, criterion, device, use_wandb=None):
                 mIoU: {round(mIoU, 4)}')
         print(f'IoU by class : {IoU_by_class}')
 
-        if use_wandb is not None:
+        if use_wandb:
             wandb.log({
                 "val/acc": acc, 
                 "val/acc_cls": acc_cls, 
@@ -117,79 +117,20 @@ def collate_fn(batch):
     return tuple(zip(*batch))
 
 
-def train(args):
-
-    seed_everything(args.seed)
-
-    # GPU 사용 가능 여부에 따라 device 정보 저장
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    num_workers = multiprocessing.cpu_count() // 2
+def train(num_epochs, model, train_loader, val_loader, criterion,
+          optimizer, saved_dir, val_every, log_interval, 
+          device, scheduler=None, use_amp=False, use_wandb=False):
 
     n_class = 11
     best_mIoU = float('-inf')
 
-    name = args.name
-    saved_dir = increment_path(os.path.join('./saved', name))
-
-    dataset_path = args.data_dir
-    train_json = args.train_json
-    val_json = args.train_json
-
-    log_interval = args.log_interval
-    val_every = args.val_every
-    num_epochs = args.epochs
-    batch_size = args.batch_size
-    lr = args.lr
-    weight_decay = args.weight_decay
-
-    # Model 정의
-    model_module = getattr(import_module("model"), 'get_smp_model')
-    model = model_module(args.model, args.encoder, args.encoder_weights)
-
-
-    # Loss function 정의
-    criterion = create_criterion(args.criterion)
-
-    # Optimizer 정의
-    optimizer = create_optimizer(args.optimizer, params=model.parameters(),
-                                 lr=lr, weight_decay=weight_decay)
-    # Scheduler 정의
-    scheduler = get_scheduler(args.scheduler, optimizer)
-
-    # Augmentation
-    transform_module = getattr(import_module("dataset"), args.augmentation)
-    train_transform = transform_module()
-    val_transform_module = getattr(import_module("dataset"),
-                                   'BaseAugmentation')
-    val_transform = val_transform_module()
-
-    # Dataset
-    train_dataset = CustomDataset(dataset_path, train_json, mode='train',
-                                  transform=train_transform)
-    val_dataset = CustomDataset(dataset_path, val_json, mode='val',
-                                transform=val_transform)
-
-    # DataLoader
-    train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
-                                               batch_size=batch_size,
-                                               drop_last=True,
-                                               shuffle=True,
-                                               num_workers=num_workers,
-                                               collate_fn=collate_fn)
-
-    val_loader = torch.utils.data.DataLoader(dataset=val_dataset,
-                                             batch_size=batch_size,
-                                             shuffle=False,
-                                             num_workers=num_workers,
-                                             collate_fn=collate_fn)
-
-    if args.use_amp is not None:
+    if use_amp:
         scaler = torch.cuda.amp.GradScaler()
 
     for epoch in range(num_epochs):
         model.train()
 
-        if args.use_wandb is not None:
+        if use_wandb:
             wandb.log({
                 'epoch': epoch + 1,
                 'lr': optimizer.param_groups[0]['lr'],
@@ -208,7 +149,7 @@ def train(args):
 
             optimizer.zero_grad()
 
-            if args.use_amp is not None:
+            if use_amp:
                 with torch.cuda.amp.autocast():
                     # inference
                     outputs = model(images)
@@ -233,7 +174,7 @@ def train(args):
             if (step + 1) % log_interval == 0:
                 print(f'Epoch [{epoch+1}/{num_epochs}], Step [{step+1}/{len(train_loader)}], \
                         Loss: {round(loss.item(),4)}, mIoU: {round(mIoU,4)}')
-                if args.use_wandb is not None:
+                if use_wandb:
                     wandb.log({                        
                         'train/acc': acc,
                         'train/acc_cls': acc_cls,
@@ -244,7 +185,7 @@ def train(args):
 
         # validation 주기에 따른 mIoU 출력 및 best model 저장
         if (epoch + 1) % val_every == 0:
-            _, val_mIoU = validation(epoch + 1, model, val_loader, criterion, device, args.use_wandb)
+            _, val_mIoU = validation(epoch + 1, model, val_loader, criterion, device, use_wandb)
             if val_mIoU > best_mIoU:
                 print(f"Best mIoU {round(val_mIoU, 4)} at epoch: {epoch + 1}")
                 best_mIoU = val_mIoU
@@ -252,7 +193,8 @@ def train(args):
                 save_model(model, saved_dir, file_name=fname)
                 print(f"Save model in {saved_dir}")
 
-                wandb.log({'Best_mIoU': best_mIoU})
+                if use_wandb:
+                    wandb.log({'Best_mIoU': best_mIoU})
 
             if epoch + 1 == num_epochs:
                 save_model(model, saved_dir, file_name='latest.pt')
@@ -261,7 +203,76 @@ def train(args):
             scheduler.step()
 
 
-if __name__ == '__main__':
+def main(args):
+
+    seed_everything(args.seed)
+
+    # GPU 사용 가능 여부에 따라 device 정보 저장
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    num_workers = multiprocessing.cpu_count() // 2
+
+    saved_dir = increment_path(os.path.join('./saved', args.name))
+
+    # Model 정의
+    model_module = getattr(import_module("model"), 'get_smp_model')
+    model = model_module(args.model, args.encoder, args.encoder_weights)
+
+    # Loss function 정의
+    criterion = create_criterion(args.criterion)
+
+    # Optimizer 정의
+    optimizer = create_optimizer(args.optimizer, params=model.parameters(),
+                                 lr=args.lr, weight_decay=args.weight_decay)
+    # Scheduler 정의
+    scheduler = get_scheduler(args.scheduler, optimizer)
+
+    # Augmentation
+    transform_module = getattr(import_module("dataset"), args.augmentation)
+    train_transform = transform_module()
+    val_transform_module = getattr(import_module("dataset"),
+                                   'BaseAugmentation')
+    val_transform = val_transform_module()
+
+    # Dataset
+    train_dataset = CustomDataset(args.data_dir, args.train_json,
+                                  mode='train', transform=train_transform)
+    val_dataset = CustomDataset(args.data_dir, args.val_json, 
+                                mode='val', transform=val_transform)
+
+    # DataLoader
+    train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
+                                               batch_size=args.batch_size,
+                                               drop_last=True,
+                                               shuffle=True,
+                                               num_workers=num_workers,
+                                               collate_fn=collate_fn)
+
+    val_loader = torch.utils.data.DataLoader(dataset=val_dataset,
+                                             batch_size=args.batch_size,
+                                             shuffle=False,
+                                             num_workers=num_workers,
+                                             collate_fn=collate_fn)
+
+    now = (datetime.now().replace(microsecond=0) + timedelta(hours=9)).strftime("%m-%d %H:%M")
+
+    if args.use_wandb:
+        wandb.init(
+            project=args.wandb_project,
+            entity=args.wandb_entity,
+            name=f'{args.name}_{now}',
+            tags=[args.model, args.encoder, args.optimizer, args.criterion],
+        )
+
+    train(args.epochs, model, train_loader, val_loader, criterion,
+          optimizer, saved_dir, args.val_every, args.log_interval, 
+          device, scheduler, args.use_amp, args.use_wandb)
+
+    if args.use_wandb:
+        wandb.finish()
+
+
+def parse_args():
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--seed', type=int, default=21, help='random seed (default: 21)')
@@ -288,20 +299,16 @@ if __name__ == '__main__':
     parser.add_argument('--wandb_entity', type=str, default=None)
 
     args = parser.parse_args()
+
+    return args
+
+
+if __name__ == '__main__':
+
+    args = parse_args()
     print(args)
 
     warnings.filterwarnings(action='ignore')
     torch.cuda.empty_cache()
 
-    now = (datetime.now().replace(microsecond=0) + timedelta(hours=9)).strftime("%m-%d %H:%M")
-
-    wandb.init(
-        project=args.wandb_project,
-        entity=args.wandb_entity,
-        name=f'{args.name}_{now}',
-        tags=[args.model, args.encoder, args.optimizer, args.criterion],
-    )
-
-    train(args)
-
-    wandb.finish()
+    main(args)
