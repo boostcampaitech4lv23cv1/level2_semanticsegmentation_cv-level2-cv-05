@@ -1,6 +1,3 @@
-# level2_semanticsegmentation_cv-level2-cv-05
-level2_semanticsegmentation_cv-level2-cv-05 created by GitHub Classroom
-
 # CV05 Semantic Segmentation
 
 ## 재활용 품목 분류를 위한 Semantic Segmentation
@@ -15,7 +12,7 @@ level2_semanticsegmentation_cv-level2-cv-05 created by GitHub Classroom
 
 ---
 
-![Untitled](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/401e2134-dcb0-4570-8b96-c1f55dff6a0e/Untitled.png)
+![7645ad37-9853-4a85-b0a8-f0f151ef05be](https://user-images.githubusercontent.com/62612606/214768120-945997c1-5195-4570-929b-3cf1f83087a5.png)
 
 바야흐로 대량 생산, 대량 소비의 시대. 우리는 많은 물건이 대량으로 생산되고, 소비되는 시대를 살고 있습니다. 하지만 이러한 문화는 '쓰레기 대란', '매립지 부족'과 같은 여러 사회 문제를 낳고 있습니다.
 
@@ -63,7 +60,7 @@ EDA 결과, class 분포 뿐 아니라 이미지 별 객체 영역 크기, 객�
 
 Pseudo Update K-fold - train set split의 학습과정에 Pseudo labeling을 추가
 
-![Untitled](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/a56c176b-e7f8-4fb0-9c8b-354bd62faad8/Untitled.png)
+![화면 캡처 2023-01-26 145728](https://user-images.githubusercontent.com/62612606/214768166-b3babf45-af74-4837-a1f4-a7ff4f4abc7c.png)
 
 **Experiment**
 
@@ -105,7 +102,8 @@ Ensemble -4가지의 model을 활용하여 ensemble(soft voting, hard voting)
 
 ---
 
-![Untitled](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/329dd15b-a5e0-4fce-bdbc-a8fcf58baabf/Untitled.png)
+![화면 캡처 2023-01-26 145659](https://user-images.githubusercontent.com/62612606/214768201-545ca5ab-e0dc-4c9e-a203-0d38037e7c02.png)
+
 
 Public : 0.7676 (19팀 중 8등), Private : 0.7638 (19팀 중 5등)
 
