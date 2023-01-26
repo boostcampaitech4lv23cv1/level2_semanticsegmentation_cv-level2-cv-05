@@ -2,15 +2,11 @@
 
 ## 재활용 품목 분류를 위한 Semantic Segmentation
 
----
-
 기간 : 2022.12.19 ~ 2023.01.05
 
 주관 : 네이버 커넥트 재단
 
 ### 대회 소개
-
----
 
 ![7645ad37-9853-4a85-b0a8-f0f151ef05be](https://user-images.githubusercontent.com/62612606/214768120-945997c1-5195-4570-929b-3cf1f83087a5.png)
 
@@ -32,9 +28,8 @@ Train : 3272장, Test : 819장
 
 mIoU(Mean Intersection over Union)
 
-### Members
+## Members
 
----
 
 김도윤: Augmentation/Model/Loss 실험, Ensemble 진행
 
@@ -46,9 +41,7 @@ mIoU(Mean Intersection over Union)
 
 정선규 : Augmentation 및 Model 실험
 
-### Project process & Experiment
-
----
+## Project process & Experiment
 
 **Process**
 
@@ -72,9 +65,8 @@ Pseudo Update K-fold - train set split의 학습과정에 Pseudo labeling을 추
 | Upernet convnext xl | 0.7329 | 0.748 |
 | PAN Swin_large | 0.7211 | 0.7138 |
 
-### Models & Schedulers
+## Models & Schedulers
 
----
 
 | Model | Schedulers | Optimizers | Loss |
 | --- | --- | --- | --- |
@@ -82,9 +74,8 @@ Pseudo Update K-fold - train set split의 학습과정에 Pseudo labeling을 추
 | Upernet Swin large(pseudo update k fold) | CosineAnnealingWarmUpRestarts | AdamW | CrossEntropyLoss |
 | UpernetConvnext_xl | Poly | AdamW | CrossEntropyLoss |
 
-### TTA & Ensemble
+## TTA & Ensemble
 
----
 
 TTA
 
@@ -98,9 +89,8 @@ Ensemble -4가지의 model을 활용하여 ensemble(soft voting, hard voting)
 - Upernet Convnext_xl K-fold
 - Upernet Convnext_xl Pseudo labeling
 
-### Rusult
+## Rusult
 
----
 
 ![화면 캡처 2023-01-26 145659](https://user-images.githubusercontent.com/62612606/214768201-545ca5ab-e0dc-4c9e-a203-0d38037e7c02.png)
 
@@ -108,8 +98,6 @@ Ensemble -4가지의 model을 활용하여 ensemble(soft voting, hard voting)
 Public : 0.7676 (19팀 중 8등), Private : 0.7638 (19팀 중 5등)
 
 ## Citation
-
----
 
 **MMsegmentation**
 
