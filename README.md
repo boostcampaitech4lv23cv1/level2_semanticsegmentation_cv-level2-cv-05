@@ -53,7 +53,8 @@ EDA 결과, class 분포 뿐 아니라 이미지 별 객체 영역 크기, 객�
 
 Pseudo Update K-fold - train set split의 학습과정에 Pseudo labeling을 추가
 
-![화면 캡처 2023-01-26 145728](https://user-images.githubusercontent.com/62612606/214768166-b3babf45-af74-4837-a1f4-a7ff4f4abc7c.png)
+![화면 캡처 2023-01-26 145659](https://user-images.githubusercontent.com/62612606/214768201-545ca5ab-e0dc-4c9e-a203-0d38037e7c02.png)
+
 
 **Experiment**
 
@@ -92,7 +93,7 @@ Ensemble -4가지의 model을 활용하여 ensemble(soft voting, hard voting)
 ## Rusult
 
 
-![화면 캡처 2023-01-26 145659](https://user-images.githubusercontent.com/62612606/214768201-545ca5ab-e0dc-4c9e-a203-0d38037e7c02.png)
+![화면 캡처 2023-01-26 145728](https://user-images.githubusercontent.com/62612606/214768166-b3babf45-af74-4837-a1f4-a7ff4f4abc7c.png)
 
 
 Public : 0.7676 (19팀 중 8등), Private : 0.7638 (19팀 중 5등)
